@@ -6,13 +6,24 @@ import json
 
 TO_REFLECT = json.load(open("toReflect.json"))
 REFLECTED_EFF = json.load(open("reflectedEff.json"))
+EFF_TO_NAME = json.load(open("eff_to_name.json"))
+NAME_TO_ACTUAL = json.load(open("name_to_actual.json"))
+ACTUAL_TO_IDX = json.load(open("actual_to_idx.json"))
+
+EFF_TO_IDX = {}
+for eff in EFF_TO_NAME:
+    EFF_TO_IDX[eff] = ACTUAL_TO_IDX[NAME_TO_ACTUAL[EFF_TO_NAME[eff]]]
 
 
 
 # Define the Skill, KeyFrame, and other necessary classes
 class Skill:
+
     def __init__(self):
         self.key_frames = []
+        self.converted_key_frames = []
+        self.skill_name = None
+        self.auto_head = 1
     
     def append_key_frame(self, key_frame):
         self.key_frames.append(key_frame)
@@ -21,11 +32,37 @@ class Skill:
         new_skill = Skill()
         for key_frame in self.key_frames:
             new_key_frame = KeyFrame()
+            new_key_frame.set_wait_time(key_frame.wait_time)
             for macro in key_frame.macros:
                 new_key_frame.append_macro(macro.get_reflection())
             new_skill.append_key_frame(new_key_frame)
 
         return new_skill  # Return a new skill as a placeholder
+    
+    def gen_converted_to_idx(self):
+        self.converted_key_frames = []
+        for key_frame in self.key_frames:
+            converted_key_frame = key_frame.convert_to_idx()
+            self.converted_key_frames.append(converted_key_frame)
+
+    def convert_to_xml(self):
+        self.gen_converted_to_idx()
+        xml = """<?xml version="1.0" encoding="UTF-8"?>"""
+        xml += "\n\n"
+        xml += f"<behavior description=\"{self.skill_name}\" auto_head=\"{self.auto_head}\">"
+        for key_frame in self.converted_key_frames:
+            xml += "\n\t"
+            xml += f"<slot delta=\"{key_frame.wait_time}\">"
+            for macro in key_frame.macros:
+                if isinstance(macro, SetTar):
+                    for effector, value in macro.effector_pairs:
+                        xml += f"\n\t\t<move id=\"{effector}\" angle=\"{value}\" />"
+            xml += "\n\t</slot>"
+        
+        xml += "\n</behavior>"
+        return xml
+
+
 
 class KeyFrame:
     def __init__(self):
@@ -37,6 +74,15 @@ class KeyFrame:
     
     def set_wait_time(self, wait_time):
         self.wait_time = wait_time
+        
+    def convert_to_idx(self):
+        converted_macros = []
+        converted_key_frame = KeyFrame()
+        converted_key_frame.wait_time = self.wait_time
+        for macro in self.macros:
+            converted_macros.append(macro.convert_to_idx())
+        converted_key_frame.macros = converted_macros
+        return converted_key_frame
 
 
 class Macro:
@@ -58,6 +104,12 @@ class SetTar(Macro):
         for effector, value in self.effector_pairs:
             reflected_effector_pairs.append((REFLECTED_EFF[effector], -value if TO_REFLECT[effector] else value))
         return SetTar(reflected_effector_pairs)
+    
+    def convert_to_idx(self):
+        converted_set_tar = SetTar([])
+        for effector, value in self.effector_pairs:
+            converted_set_tar.effector_pairs.append((EFF_TO_IDX[effector], value))
+        return converted_set_tar
 
 
 # Define the parser
@@ -86,10 +138,12 @@ stabilize = Literal("stabilize").suppress()
 def start_skill_cb(skillname, parser):
     parser.current_skill_type = skillname
     parser.skills[skillname] = Skill()
+    parser.skills[skillname].skill_name = skillname
 
 def reflect_skill_cb(source, target, parser):
     if source in parser.skills:
         parser.skills[target] = parser.skills[source].get_reflection()
+        parser.skills[target].skill_name = target
 
 def start_key_frame_cb(parser):
     parser.current_key_frame = KeyFrame()
@@ -156,6 +210,9 @@ skills = {}
 body_model = None
 parser = type('Parser', (), {'skills': skills, 'body_model': body_model, 'current_skill_type': None, 'current_key_frame': None, 'enum_parser': None})
 
+def convert_to_xml(skill: Skill):
+    pass
+
 if __name__ == "__main__":
     filename = "kick_long_15.skl"
     with open (filename, "r") as file:
@@ -173,3 +230,6 @@ if __name__ == "__main__":
             #         print(macro.joint_indices)
             #     else:
             #         print("Unknown macro type")
+        xml = skill.convert_to_xml()
+        with open(f"{skill_name}_converted.xml", "w") as file:
+            file.write(xml)
