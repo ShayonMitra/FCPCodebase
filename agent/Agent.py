@@ -10,20 +10,24 @@ class Agent(Base_Agent):
                  team_name:str, enable_log, enable_draw, wait_for_server=True, is_fat_proxy=False) -> None:
         
         # define robot type
-        robot_type = (0,1,1,1,2,3,3,3,4,4,4)[unum-1]
+        # robot_type = (0,1,1,1,2,3,3,3,4,4,4)[unum-1]
+        robot_type = (0,2,1,2,2,3,3,3,4,4,4)[unum-1]
 
         # Initialize base agent
         # Args: Server IP, Agent Port, Monitor Port, Uniform No., Robot Type, Team Name, Enable Log, Enable Draw, play mode correction, Wait for Server, Hear Callback
         super().__init__(host, agent_port, monitor_port, unum, robot_type, team_name, enable_log, enable_draw, True, wait_for_server, None)
 
         self.bestRoleMap = {}
+        self.old_pos = (0,0)
+        self.cycles = 0
+        self.previous_positions = {}
         self.enable_draw = enable_draw
         self.state = 0  # 0-Normal, 1-Getting up, 2-Kicking
         self.kick_direction = 0
         self.kick_distance = 0
         self.fat_proxy_cmd = "" if is_fat_proxy else None
         self.fat_proxy_walk = np.zeros(3) # filtered walk parameters for fat proxy
-
+        self.role=None
         self.init_pos = ([-14,0],[-9,-5],[-9,0],[-9,5],[-5,-5],[-5,0],[-5,5],[-1,-6],[-1,-2.5],[-1,2.5],[-1,6])[unum-1] # initial formation
 
 
@@ -183,31 +187,50 @@ class Agent(Base_Agent):
                 self.move(self.init_pos, orientation=ball_dir) # walk in place
         elif PM == w.M_THEIR_KICKOFF:
             self.move(self.init_pos, orientation=ball_dir) # walk in place
+        
+        
         elif active_player_unum != r.unum: # I am not the active player
             if r.unum == 1: # I am the goalkeeper
                 self.move(self.init_pos, orientation=ball_dir) # walk in place 
             else:
+
                 # dynamic role assignment to calculate the new position of the inactive players
-                role_mapping = self.dynamic_role_assignment(active_player_unum)
-                try:
-                    new_x, new_y = role_mapping[r.unum]
-                except:
-                    print("Fell into except!")
-                    print(r.unum)
-                    print(role_mapping)
-                    new_x, new_y = ball_2d[0], ball_2d[1]
-                print("Agent Uniform Number : ", r.unum)
-                print("Formation Positions : ", role_mapping)
+                if self.cycles == 0:
+                    role_mapping = self.dynamic_role_assignment(active_player_unum)
+                    try:
+                        # print("Assigning roles to inactive players dynamically! State = ", self.state)
+                        new_x, new_y = role_mapping[r.unum]
+                        self.old_pos = (new_x, new_y)
+                        # print("AGENT", r.unum, "GO TO : ", new_x, new_y)
+                    except:
+                        # print("Failed to assign role, State = ", self.state)
+                        new_x, new_y = ball_2d[0], ball_2d[1]
+                    self.cycles = 100
+                else:
+                    self.cycles -= 1
+                    new_x, new_y = self.old_pos
+
+                # Now call the new EWMA function to smooth the transition
+                smoothed_x, smoothed_y = self.apply_ewma_to_positions((new_x, new_y), r.unum)
+
+                # Move the agent to the smoothed position
+                # self.move((smoothed_x, smoothed_y), orientation=ball_dir, priority_unums=[active_player_unum])
+
                 # compute basic formation position based on ball position
                 # new_x = max(0.5,(ball_2d[0]+15)/15) * (self.init_pos[0]+15) - 15
             
                 # if self.min_teammate_ball_dist < self.min_opponent_ball_dist:
                 #     new_x = min(new_x + 3.5, 13) # advance if team has possession
                 # self.move((new_x,self.init_pos[1]), orientation=ball_dir, priority_unums=[active_player_unum])
+                if self.enable_draw: 
+                    d = w.draw
+                    d.point((new_x,new_y), 5, d.Color.blue, "target", False) # last ball prediction
+                    d.annotation((new_x,new_y), f"{r.unum}" , d.Color.yellow, "target")
 
-                self.move((new_x,new_y), orientation=ball_dir, priority_unums=[active_player_unum])
+                self.move((new_x,new_y), orientation=None, priority_unums=[active_player_unum])
 
         else: # I am the active player
+            # print("Active player", r.unum)
             path_draw_options(enable_obstacles=True, enable_path=True, use_team_drawing_channel=True) # enable path drawings for active player (ignored if self.enable_draw is False)
             enable_pass_command = (PM == w.M_PLAY_ON and ball_2d[0]<6)
 
@@ -239,6 +262,8 @@ class Agent(Base_Agent):
         #---------------------- annotations for debugging
         if self.enable_draw: 
             d = w.draw
+            # d.point((new_x,new_y), 5, d.Color.blue, "status", False) # last ball prediction
+
             if active_player_unum == r.unum:
                 d.point(slow_ball_pos, 3, d.Color.pink, "status", False) # predicted future 2D ball position when ball speed <= 0.5 m/s
                 d.point(w.ball_2d_pred_pos[-1], 5, d.Color.pink, "status", False) # last ball prediction
@@ -285,7 +310,9 @@ class Agent(Base_Agent):
             self.fat_proxy_cmd += (f"(proxy dash {0} {0} {target_dir:.1f})")
         else:
             self.fat_proxy_cmd += (f"(proxy dash {20} {0} {target_dir:.1f})")
-    
+
+#----------------------------------- DYNAMIC ROLE ASSIGNMENT 
+
     def calculate_player_positions(self):
         '''
         Calculate the positions of all players/roles based on the current ball position.
@@ -301,7 +328,7 @@ class Agent(Base_Agent):
         by = ball_2d[1]
 
         # Basic 4-3-3 formation with roles Left Wing, Right Wing, Center Mid... and so on
-
+        # self.role.calcul
         # Coordinate for Left Wing
         player_positions[8] = (bx, (10.0 + by)/2.0)
         
@@ -345,9 +372,10 @@ class Agent(Base_Agent):
             active_player_unum = np.random.randint(2, 12)
 
         agents_unums = [_ for _ in range(2, 12)]
-        print("The inactive players are : ", agents_unums)
-        print("The active player is : ", active_player_unum, end="\n\n")
-        agents_unums.remove(active_player_unum)
+        try: 
+            agents_unums.remove(active_player_unum)
+        except:
+            print(active_player_unum)
 
         # Calculate ideal positions for each player
         player_positions = self.calculate_player_positions()
@@ -419,3 +447,30 @@ class Agent(Base_Agent):
         sorted_distances = tuple(sorted(distances, reverse=True))
 
         return sorted_distances
+
+    def apply_ewma_to_positions(self, new_position, unum, alpha=0.1):
+        """
+        Apply Exponentially Weighted Moving Average (EWMA) to smooth the transition of positions.
+
+        :param current_position: tuple of current (smoothed) position (x, y)
+        :param new_position: tuple of new assigned position (x, y)
+        :param unum: agent's uniform number
+        :param alpha: smoothing factor, controls how much weight is given to the new position (0 < alpha < 1)
+        :return: smoothed (x, y) position
+        """
+        
+        # If this agent has a previous position stored, apply EWMA
+        if unum in self.previous_positions:
+            prev_x, prev_y = self.previous_positions[unum]
+            
+            # Apply the EWMA formula
+            smoothed_x = alpha * new_position[0] + (1 - alpha) * prev_x
+            smoothed_y = alpha * new_position[1] + (1 - alpha) * prev_y
+        else:
+            # If no previous position, just use the new position
+            smoothed_x, smoothed_y = new_position
+
+        # Store the smoothed position for future cycles
+        self.previous_positions[unum] = (smoothed_x, smoothed_y)
+
+        return smoothed_x, smoothed_y
