@@ -3,18 +3,9 @@ from math_ops.Math_Ops import Math_Ops as M
 import math
 import numpy as np
 import itertools
-from abc import abstractmethod
-from behaviors.Behavior import Behavior
-from communication.Radio import Radio
-from communication.Server_Comm import Server_Comm
-from communication.World_Parser import World_Parser
-from logs.Logger import Logger
-from math_ops.Inverse_Kinematics import Inverse_Kinematics
-from world.commons.Path_Manager import Path_Manager
-from world.World import World
 
-class Role():
-    def __init__(self, host:str, unum:int,
+class Role(Base_Agent):
+    def __init__(self, host:str, agent_port:int, monitor_port:int, unum:int,
                  team_name:str, enable_log, enable_draw, wait_for_server=True, is_fat_proxy=False) -> None:
         
         # define robot type
@@ -30,23 +21,13 @@ class Role():
         self.cycles = 0
         self.previous_positions = {}
         self.enable_draw = enable_draw
-        
+        self.state = 0  # 0-Normal, 1-Getting up, 2-Kicking
         self.kick_direction = 0
         self.kick_distance = 0
         self.fat_proxy_cmd = "" if is_fat_proxy else None
         self.fat_proxy_walk = np.zeros(3) # filtered walk parameters for fat proxy
         self.role=None
         self.init_pos = ([-14,0],[-9,-5],[-9,0],[-9,5],[-5,-5],[-5,0],[-5,5],[-1,-6],[-1,-2.5],[-1,2.5],[-1,6])[unum-1] # initial formation
-        self.radio = None # hear_message may be called during Server_Comm instantiation
-        self.logger = Logger(enable_log, f"{team_name}_{unum}")
-        self.world = World(robot_type, team_name, unum, apply_play_mode_correction, enable_draw, self.logger, host)
-        self.world_parser = World_Parser(self.world, self.hear_message if hear_callback is None else hear_callback)
-        self.scom = Server_Comm(host,agent_port,monitor_port,unum,robot_type,team_name,self.world_parser,self.world,Base_Agent.all_agents,wait_for_server)
-        self.inv_kinematics = Inverse_Kinematics(self.world.robot)
-        self.behavior = Behavior(self)
-        self.path_manager = Path_Manager(self.world)
-        self.radio = Radio(self.world, self.scom.commit_announcement)
-        self.behavior.create_behaviors()
 
 
     def calculate_player_positions(self):
