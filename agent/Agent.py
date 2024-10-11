@@ -10,8 +10,8 @@ class Agent(Base_Agent):
                  team_name:str, enable_log, enable_draw, wait_for_server=True, is_fat_proxy=False) -> None:
         
         # define robot type
-        # robot_type = (0,1,1,1,2,3,3,3,4,4,4)[unum-1]
-        robot_type = (0,2,1,2,2,3,3,3,4,4,4)[unum-1]
+        robot_type = (0,1,1,1,2,3,3,3,4,4,4)[unum-1]
+        # robot_type = (0,2,1,2,2,3,3,3,4,4,4)[unum-1]
 
         # Initialize base agent
         # Args: Server IP, Agent Port, Monitor Port, Uniform No., Robot Type, Team Name, Enable Log, Enable Draw, play mode correction, Wait for Server, Hear Callback
@@ -316,49 +316,35 @@ class Agent(Base_Agent):
     def calculate_player_positions(self):
         '''
         Calculate the positions of all players/roles based on the current ball position.
-        returns: numpy array of 9 positions (x,y) for 9 players
+        returns: numpy array of 11 positions (x,y) for 11 players
         '''
         w = self.world
         ball_2d = w.ball_abs_pos[:2]
-
-        # Initialise all 9 positions to (0,0) 
-        player_positions = np.array([(0.0, 0.0) for _ in range(9)])
-        # x and y coordinates of the ball
         bx = ball_2d[0]
         by = ball_2d[1]
 
-        # Basic 4-3-3 formation with roles Left Wing, Right Wing, Center Mid... and so on
-        # self.role.calcul
-        # Coordinate for Left Wing
-        player_positions[8] = (bx, (10.0 + by)/2.0)
-        
-        # Coordinate for Right Wing
-        player_positions[7] = (bx, (by + (-10.0))/2.0)
-        
-        # Coordinate for Center Mid
-        player_positions[6] = ((-15*1.0 + bx*2.0)/3.0, (by*2.0 + 10.0)/3.0)
-        
-        # Coordinate for Left Center Mid
-        player_positions[5] = ((-15*1.0 + bx*2.0)/3.0, by)
-        
-        # Coordinate for Right Center Mid
-        player_positions[4] = ((-15*1.0 + bx*2.0)/3.0, (by*2.0 + (-10.0))/3.0)
-        
-        # Coordinate for Right Back
-        player_positions[3] = ((-15*2.0 + bx*1.0)/3.0, (by*3.0 + (-10.0)*2.0)/5.0)
-        
-        # Coordinate for Right Center Back
-        player_positions[2] = ((-15*2.0 + bx*1.0)/3.0, (by*4.0 + (-10.0)*1.0)/5.0)
-        
-        # Coordinate for Left Center Back
-        player_positions[1] = ((-15*2.0 + bx*1.0)/3.0, (by*4.0 + (10.0)*1.0)/5.0)
-        
-        # Coordinate for Left Back
-        player_positions[0] = ((-15*2.0 + bx*1.0)/3.0, (by*3.0 + (10.0)*2.0)/5.0)
+        # Initialise all 11 positions to (0,0)
+        player_positions = np.array([(0.0, 0.0) for _ in range(11)])
 
-        # Return a numpy array consisting of coordinates of all players
+        # Set goalkeeper position (index 0) to (-14, 0)
+        player_positions[0] = (-14.0, 0.0)
+
+        # Set active player position (index 1) to the ball's position
+        player_positions[1] = (bx, by)
+
+        # Basic 4-3-3 formation with Left Wing, Right Wing, Center Mid, etc.
+        player_positions[10] = (bx, (10.0 + by)/2.0)  # Left Wing
+        player_positions[9] = (bx, (by + (-10.0))/2.0)  # Right Wing
+        player_positions[8] = ((-15*1.0 + bx*2.0)/3.0, (by*2.0 + 10.0)/3.0)  # Center Mid
+        player_positions[7] = ((-15*1.0 + bx*2.0)/3.0, by)  # Left Center Mid
+        player_positions[6] = ((-15*1.0 + bx*2.0)/3.0, (by*2.0 + (-10.0))/3.0)  # Right Center Mid
+        player_positions[5] = ((-15*2.0 + bx*1.0)/3.0, (by*3.0 + (-10.0)*2.0)/5.0)  # Right Back
+        player_positions[4] = ((-15*2.0 + bx*1.0)/3.0, (by*4.0 + (-10.0)*1.0)/5.0)  # Right Center Back
+        player_positions[3] = ((-15*2.0 + bx*1.0)/3.0, (by*4.0 + (10.0)*1.0)/5.0)  # Left Center Back
+        player_positions[2] = ((-15*2.0 + bx*1.0)/3.0, (by*3.0 + (10.0)*2.0)/5.0)  # Left Back
+
+        # Return a numpy array consisting of coordinates of all 11 players
         return player_positions
-
 
     def dynamic_role_assignment(self, active_player_unum):
         '''
@@ -367,15 +353,9 @@ class Agent(Base_Agent):
         '''
         w = self.world  # Access the world object
 
-        # If the goalkeeper is the active player, randomly assign active player in dynamic role assignment
-        if active_player_unum == 1 :
-            active_player_unum = np.random.randint(2, 12)
-
-        agents_unums = [_ for _ in range(2, 12)]
-        try: 
-            agents_unums.remove(active_player_unum)
-        except:
-            print(active_player_unum)
+        # Get the uniform numbers of the spawned players
+        agents_unums = [p.unum for p in w.teammates]
+        sorted(agents_unums)
 
         # Calculate ideal positions for each player
         player_positions = self.calculate_player_positions()
@@ -386,38 +366,38 @@ class Agent(Base_Agent):
             (w.time_local_ms - p.state_last_update <= 360 or p.is_self) and 
             not p.state_fallen 
             else np.array([1000, 1000])  # Large distance if the agent is invalid, not updated, or has fallen
-            for p in w.teammates if p.unum in agents_unums
+            for p in w.teammates
         }
 
         # Initialize bestRoleMap to store optimal assignments for subsets
         n = len(agents_unums)
-        self.bestRoleMap = {frozenset(): (None, 0)}  # (Mapping, Cost) for empty set
 
-        # Iterate through each role (position) from 1 to n
-        for k in range(1, n + 1):
-            pk = player_positions[k - 1]  # Current position to assign (0-based index)
+        if n == 1:
+            return {agents_unums[0]: player_positions[0]}
 
-            # Iterate over each agent to assign the current role
+        self.bestRoleMap = {frozenset(): ({1:player_positions[0], active_player_unum:player_positions[1]}, 0)}  # (Mapping, Cost) for empty set
+
+
+        for k in range(3, n + 1):
+            pk = player_positions[k - 1]
+
             for a in agents_unums:
                 remaining_agents = [agent for agent in agents_unums if agent != a]
                 subsets = list(itertools.combinations(remaining_agents, k - 1))
 
-                # Iterate through each subset of agents
                 for subset in subsets:
                     subset_set = frozenset(subset)
                     m0, m0_cost = self.bestRoleMap.get(subset_set, (None, float('inf')))
 
-                    # Create new mapping by adding current agent and role
                     new_mapping = {a: pk}
                     if m0:
                         new_mapping.update(m0)
 
-                    # Calculate the cost for this new assignment
                     cost = self.calculate_cost(new_mapping, agent_current_positions)
                     if (subset_set | frozenset({a})) not in self.bestRoleMap or cost < self.bestRoleMap[subset_set | frozenset({a})][1]:
                         self.bestRoleMap[subset_set | frozenset({a})] = (new_mapping, cost)
 
-        return self.bestRoleMap[frozenset(agents_unums)][0]  # Return the optimal assignment
+        return self.bestRoleMap[frozenset(agents_unums)][0]
 
     def calculate_cost(self, mapping, current_positions):
         """
