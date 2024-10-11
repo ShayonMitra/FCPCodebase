@@ -68,7 +68,7 @@ class Agent(Base_Agent):
             True to avoid obstacles using path planning (maybe reduce timeout arg if this function is called multiple times per simulation cycle)
         priority_unums : list
             list of teammates to avoid (since their role is more important)
-        is_aggressive : bool
+        is_aggressive : bool    
             if True, safety margins are reduced for opponents
         timeout : float
             restrict path planning to a maximum duration (in microseconds)    
