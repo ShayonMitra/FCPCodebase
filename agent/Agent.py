@@ -3,6 +3,8 @@ from math_ops.Math_Ops import Math_Ops as M
 import math
 import numpy as np
 import itertools
+from agent.Roles import *
+from agent.Tactics import *
 
 
 class Agent(Base_Agent):
@@ -198,12 +200,14 @@ class Agent(Base_Agent):
                 if self.cycles == 0:
                     role_mapping = self.dynamic_role_assignment(active_player_unum)
                     try:
-                        # print("Assigning roles to inactive players dynamically! State = ", self.state)
+                        myTactic = Tactics(True, True, w, r.unum)
+                        myRole = myTactic.getPlayerRole()
                         new_x, new_y = role_mapping[r.unum]
                         self.old_pos = (new_x, new_y)
-                        # print("AGENT", r.unum, "GO TO : ", new_x, new_y)
+                        
+                        print(new_x, new_y, " OOP : ", myRole.idealPos)
                     except:
-                        # print("Failed to assign role, State = ", self.state)
+                        print("Failed to assign role, for agent = ", r.unum)
                         new_x, new_y = ball_2d[0], ball_2d[1]
                     self.cycles = 100
                 else:
@@ -355,7 +359,7 @@ class Agent(Base_Agent):
 
         # Get the uniform numbers of the spawned players
         agents_unums = [p.unum for p in w.teammates]
-        sorted(agents_unums)
+        agents_unums = sorted(agents_unums)
 
         # Calculate ideal positions for each player
         player_positions = self.calculate_player_positions()
@@ -372,13 +376,14 @@ class Agent(Base_Agent):
         # Initialize bestRoleMap to store optimal assignments for subsets
         n = len(agents_unums)
 
+        self.bestRoleMap = {frozenset({1}): ({1:player_positions[0]}, 0)}  # (Mapping, Cost) for empty set
+        
         if n == 1:
             return {agents_unums[0]: player_positions[0]}
 
-        self.bestRoleMap = {frozenset(): ({1:player_positions[0], active_player_unum:player_positions[1]}, 0)}  # (Mapping, Cost) for empty set
 
 
-        for k in range(3, n + 1):
+        for k in range(2, n + 1):
             pk = player_positions[k - 1]
 
             for a in agents_unums:
