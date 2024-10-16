@@ -191,31 +191,27 @@ class Agent(Base_Agent):
             self.move(self.init_pos, orientation=ball_dir) # walk in place
         
         
-        elif active_player_unum != r.unum: # I am not the active player
-            if r.unum == 1: # I am the goalkeeper
-                self.move(self.init_pos, orientation=ball_dir) # walk in place 
-            else:
+        else: # I am not the active player
+            # if r.unum == 1: # I am the goalkeeper
+            #     self.move(self.init_pos, orientation=ball_dir) # walk in place 
+            # else:
 
                 # dynamic role assignment to calculate the new position of the inactive players
                 if self.cycles == 0:
                     role_mapping = self.dynamic_role_assignment(active_player_unum)
-                    try:
-                        myTactic = Tactics(True, True, w, r.unum)
-                        myRole = myTactic.getPlayerRole()
-                        new_x, new_y = role_mapping[r.unum]
-                        self.old_pos = (new_x, new_y)
-                        
-                        print(new_x, new_y, " OOP : ", myRole.idealPos)
-                    except:
-                        print("Failed to assign role, for agent = ", r.unum)
-                        new_x, new_y = ball_2d[0], ball_2d[1]
-                    self.cycles = 100
+                    myTactic = Tactics(True, True, w, r.unum)
+                    myRole = myTactic.getPlayerRole()
+                    
+                    new_x, new_y = myRole.idealPos
+                    self.old_pos = (new_x, new_y)
+                    
+                    self.cycles = 20
                 else:
                     self.cycles -= 1
                     new_x, new_y = self.old_pos
 
                 # Now call the new EWMA function to smooth the transition
-                smoothed_x, smoothed_y = self.apply_ewma_to_positions((new_x, new_y), r.unum)
+                # smoothed_x, smoothed_y = self.apply_ewma_to_positions((new_x, new_y), r.unum)
 
                 # Move the agent to the smoothed position
                 # self.move((smoothed_x, smoothed_y), orientation=ball_dir, priority_unums=[active_player_unum])
@@ -232,26 +228,27 @@ class Agent(Base_Agent):
                     d.annotation((new_x,new_y), f"{r.unum}" , d.Color.yellow, "target")
 
                 self.move((new_x,new_y), orientation=None, priority_unums=[active_player_unum])
+                # myRole.move2point()
 
-        else: # I am the active player
-            # print("Active player", r.unum)
-            path_draw_options(enable_obstacles=True, enable_path=True, use_team_drawing_channel=True) # enable path drawings for active player (ignored if self.enable_draw is False)
-            enable_pass_command = (PM == w.M_PLAY_ON and ball_2d[0]<6)
+        # else: # I am the active player
+        #     # print("Active player", r.unum)
+        #     path_draw_options(enable_obstacles=True, enable_path=True, use_team_drawing_channel=True) # enable path drawings for active player (ignored if self.enable_draw is False)
+        #     enable_pass_command = (PM == w.M_PLAY_ON and ball_2d[0]<6)
 
-            if r.unum == 1 and PM_GROUP == w.MG_THEIR_KICK: # goalkeeper during their kick
-                self.move(self.init_pos, orientation=ball_dir) # walk in place 
-            if PM == w.M_OUR_CORNER_KICK:
-                self.kick( -np.sign(ball_2d[1])*95, 5.5) # kick the ball into the space in front of the opponent's goal
-                # no need to change the state when PM is not Play On
-            elif self.min_opponent_ball_dist + 0.5 < self.min_teammate_ball_dist: # defend if opponent is considerably closer to the ball
-                if self.state == 2: # commit to kick while aborting
-                    self.state = 0 if self.kick(abort=True) else 2
-                else: # move towards ball, but position myself between ball and our goal
-                    self.move(slow_ball_pos + M.normalize_vec((-16,0) - slow_ball_pos) * 0.2, is_aggressive=True)
-            else:
-                self.state = 0 if self.kick(goal_dir,9,False,enable_pass_command) else 2
+        #     if r.unum == 1 and PM_GROUP == w.MG_THEIR_KICK: # goalkeeper during their kick
+        #         self.move(self.init_pos, orientation=ball_dir) # walk in place 
+        #     if PM == w.M_OUR_CORNER_KICK:
+        #         self.kick( -np.sign(ball_2d[1])*95, 5.5) # kick the ball into the space in front of the opponent's goal
+        #         # no need to change the state when PM is not Play On
+        #     elif self.min_opponent_ball_dist + 0.5 < self.min_teammate_ball_dist: # defend if opponent is considerably closer to the ball
+        #         if self.state == 2: # commit to kick while aborting
+        #             self.state = 0 if self.kick(abort=True) else 2
+        #         else: # move towards ball, but position myself between ball and our goal
+        #             self.move(slow_ball_pos + M.normalize_vec((-16,0) - slow_ball_pos) * 0.2, is_aggressive=True)
+        #     else:
+        #         self.state = 0 if self.kick(goal_dir,9,False,enable_pass_command) else 2
 
-            path_draw_options(enable_obstacles=False, enable_path=False) # disable path drawings
+        #     path_draw_options(enable_obstacles=False, enable_path=False) # disable path drawings
 
         #--------------------------------------- 3. Broadcast
         self.radio.broadcast()

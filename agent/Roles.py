@@ -9,48 +9,38 @@ class Role:
     def __init__(self, idealx, idealy, world) -> None:
         self.world = world
         self.idealPos = (idealx, idealy)
+    def move2point(self):
+        self.move(self.idealPos())
 
 class Striker(Role):
-    def move2point(self):
-        self.move(self.idealPos())
+    pass
 
 class LeftWing(Role):
-    def move2point(self):
-        self.move(self.idealPos())
+    pass
 
 class RightWing(Role):
-    def move2point(self):
-        self.move(self.idealPos())
+    pass
 
 class LeftBack(Role):
-    def move2point(self):
-        self.move(self.idealPos())
+    pass
 
 class RightBack(Role):
-    def move2point(self):
-        self.move(self.idealPos())
+    pass
 
 class GoalKeeper(Role):
-    def move2point(self):
-        self.move(self.idealPos())
+    pass
 
 class CenterAttackingMid(Role):
-    def move2point(self):
-        self.move(self.idealPos())
+    pass
 
 class RightDefensiveMid(Role):
-    def move2point(self):
-        self.move(self.idealPos())
+    pass
 
 class LeftDefensiveMid(Role):
-    def move2point(self):
-        self.move(self.idealPos())
+    pass
 
 class LeftCenterBack(Role):
-    def move2point(self):
-        self.move(self.idealPos())
-
+    pass
 
 class RightCenterBack(Role):
-    def move2point(self):
-        self.move(self.idealPos())
+    pass

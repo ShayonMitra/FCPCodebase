@@ -17,29 +17,13 @@ class Tactics():
         self.unum = unum  # Agent uniform number (player ID)
         self.init_pos = ([-14, 0], [-9, -5], [-9, 0], [-9, 5], [-5, -5], [-5, 0], [-5, 5], [-1, -6], [-1, -2.5], [-1, 2.5], [-1, 6])[unum-1]  # Initial formation
         self.player_formation = None
-        #self.roles_dict = self.create_roles()  # Dictionary for roles
-
-    # def create_roles(self):
-    #     """
-    #     Create a dictionary that maps agent uniform numbers to their respective roles.
-    #     This uses the roles from the `Roles.py` module.
-    #     """
-    #     return {
-    #         1: GoalKeeper(self.unum, self.world),
-    #         2: LeftBack(self.unum, self.world),
-    #         3: RightBack(self.unum, self.world),
-    #         4: LeftCenterBack(self.unum, self.world),
-    #         5: CenterAttackingMid(self.unum, self.world),
-    #         6: Striker(self.unum, self.world),
-    #         7: RightWing(self.unum, self.world),
-    #         8: LeftWing(self.unum, self.world),
-    #         9: RightCenterBack(self.unum, self.world)
-    #     }
+        
 #----------------------------------- DYNAMIC ROLE ASSIGNMENT 
 
     def getPlayerRole(self):
         # Returns Role Object for 'unum' player
-        return self.dynamic_role_assignment()[self.unum][2]
+        d = self.dynamic_role_assignment()
+        return d[self.unum][2]
 
     def calculate_role_positions(self):
         '''
@@ -88,17 +72,17 @@ class Tactics():
         return role_positions
 
     def dynamic_role_assignment(self):
-        '''
-        Assign roles to the inactive players based on the current ball position.
-        return : dictionary mapping agent_unum to their assigned positions
-        '''
+        """
+        Assign roles to all players based on the current ball position.
+        Ensures that the player with unum 1 is always assigned to the goalkeeper role.
+        Returns: Dictionary mapping agent_unum to their assigned positions.
+        """
         w = self.world  # Access the world object
 
-        # Get the uniform numbers of the spawned players
-        agents_unums = [p.unum for p in w.teammates]
-        agents_unums = sorted(agents_unums)
+        # Get the uniform numbers of the spawned players, including goalkeeper and active player
+        agents_unums = sorted([p.unum for p in w.teammates])
 
-        # Calculate ideal positions for each player
+        # Calculate ideal positions for each player (11 roles total)
         role_positions = self.calculate_role_positions()
 
         # Create a dictionary mapping agent_unum to their current positions
@@ -110,41 +94,55 @@ class Tactics():
             for p in w.teammates
         }
 
-        # Initialize bestRoleMap to store optimal assignments for subsets
+        # Initialize the bestRoleMap to store optimal assignments for each subset of players
         n = len(agents_unums)
+        self.bestRoleMap = {frozenset(): (None, 0)}  # (Mapping, Cost) for an empty set
 
-        self.bestRoleMap = {frozenset({1}): ({1:role_positions[0]}, 0)}  # (Mapping, Cost) for empty set
-        
+        # Handle the special case where there is only one agent (only the goalkeeper)
         if n == 1:
-            return {agents_unums[0]: role_positions[0]}
+            return {agents_unums[0]: role_positions[0]}, 0
 
+        # Loop through each position to assign (1 to n), ensuring unum 1 is always the goalkeeper
+        for k in range(1, n + 1):
+            pk = role_positions[k - 1]  # Current role position to be assigned
 
-
-        for k in range(2, n + 1):
-            pk = role_positions[k - 1]
-
+            # Iterate through each agent to assign the current role
             for a in agents_unums:
+                # Ensure unum 1 (goalkeeper) is always assigned to the goalkeeper position
+                if a == 1 and k != 1:
+                    continue  # Skip if trying to assign a non-goalkeeper position to the goalkeeper
+                if a != 1 and k == 1:
+                    continue  # Skip if trying to assign the goalkeeper role to a non-goalkeeper player
+
                 remaining_agents = [agent for agent in agents_unums if agent != a]
                 subsets = list(itertools.combinations(remaining_agents, k - 1))
 
+                # Iterate through each subset of agents to assign the current role
                 for subset in subsets:
                     subset_set = frozenset(subset)
                     m0, m0_cost = self.bestRoleMap.get(subset_set, (None, float('inf')))
 
+                    # Create a new mapping by adding the current agent and role
                     new_mapping = {a: pk}
                     if m0:
                         new_mapping.update(m0)
 
+                    # Calculate the cost for this new assignment
                     cost = self.calculate_cost(new_mapping, agent_current_positions)
+
+                    # Update the bestRoleMap if this new assignment has a lower cost
                     if (subset_set | frozenset({a})) not in self.bestRoleMap or cost < self.bestRoleMap[subset_set | frozenset({a})][1]:
                         self.bestRoleMap[subset_set | frozenset({a})] = (new_mapping, cost)
 
-        return self.bestRoleMap[frozenset(agents_unums)][0]
+        # Ensure that unum 1 is always assigned the goalkeeper role
+        optimal_assignment = self.bestRoleMap[frozenset(agents_unums)][0]
+        optimal_assignment[1] = role_positions[0]  # Goalkeeper position at index 0
+
+        return optimal_assignment  # Return the optimal role assignment
 
     def calculate_cost(self, mapping, current_positions):
         """
         Calculate the lexicographically sorted tuple of distances for the given role assignment mapping.
-
         :param mapping: Dictionary mapping agents to positions.
                         Each key in the mapping is an agent uniform number, and each value is the assigned position.
         :param current_positions: Dictionary or list that stores the current positions of agents, indexed by their uniform numbers.
@@ -157,7 +155,7 @@ class Tactics():
         # Calculate the distance for each agent to its assigned role position
         for agent_unum, target_position in mapping.items():
             # Retrieve the current position of the agent
-            target_position = target_position[:2:]
+            target_position = target_position[:2]
             agent_current_position = current_positions[agent_unum]  # This assumes current_positions is a dictionary with agent_unum as keys
 
             # Calculate the Euclidean distance between the agent's current position and the target position
