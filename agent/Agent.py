@@ -191,7 +191,7 @@ class Agent(Base_Agent):
             self.move(self.init_pos, orientation=ball_dir) # walk in place
         
         
-        else: # I am not the active player
+        else:
             # if r.unum == 1: # I am the goalkeeper
             #     self.move(self.init_pos, orientation=ball_dir) # walk in place 
             # else:

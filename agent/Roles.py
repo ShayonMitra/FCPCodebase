@@ -13,34 +13,45 @@ class Role:
         self.move(self.idealPos())
 
 class Striker(Role):
-    pass
+    def __repr__(self) -> str:
+        return "Striker"
 
 class LeftWing(Role):
-    pass
+    def __repr__(self) -> str:
+        return "LeftWing"
 
 class RightWing(Role):
-    pass
+    def __repr__(self) -> str:
+        return "RightWing"
 
 class LeftBack(Role):
-    pass
+    def __repr__(self) -> str:
+        return "LeftBack"
 
 class RightBack(Role):
-    pass
+    def __repr__(self) -> str:
+        return "RightBack"
 
 class GoalKeeper(Role):
-    pass
+    def __repr__(self) -> str:
+        return "GoalKeeper"
 
 class CenterAttackingMid(Role):
-    pass
+    def __repr__(self) -> str:
+        return "CenterAttackingMid"
 
 class RightDefensiveMid(Role):
-    pass
+    def __repr__(self) -> str:
+        return "RightDefensiveMid"
 
 class LeftDefensiveMid(Role):
-    pass
+    def __repr__(self) -> str:
+        return "LeftDefensiveMid"
 
 class LeftCenterBack(Role):
-    pass
+    def __repr__(self) -> str:
+        return "LeftCenterBack"
 
 class RightCenterBack(Role):
-    pass
+    def __repr__(self) -> str:
+        return "RightCenterBack"

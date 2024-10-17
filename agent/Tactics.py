@@ -22,8 +22,9 @@ class Tactics():
 
     def getPlayerRole(self):
         # Returns Role Object for 'unum' player
-        d = self.dynamic_role_assignment()
-        return d[self.unum][2]
+        assignmentCalcd = self.dynamic_role_assignment()
+        role = assignmentCalcd[self.unum][2]
+        return role
 
     def calculate_role_positions(self):
         '''
@@ -74,15 +75,16 @@ class Tactics():
     def dynamic_role_assignment(self):
         """
         Assign roles to all players based on the current ball position.
-        Ensures that the player with unum 1 is always assigned to the goalkeeper role.
+        Ensures that the player with unum 1 is always assigned to the goalkeeper role,
+        and assigns the closest player to the ball as the striker.
         Returns: Dictionary mapping agent_unum to their assigned positions.
         """
         w = self.world  # Access the world object
 
-        # Get the uniform numbers of the spawned players, including goalkeeper and active player
-        agents_unums = sorted([p.unum for p in w.teammates])
-
-        # Calculate ideal positions for each player (11 roles total)
+        # Get the uniform numbers of the spawned players (excluding the active player and the goalkeeper for now)
+        agents_unums = sorted([p.unum for p in w.teammates if p.unum != 1])  # Exclude goalkeeper (unum 1)
+        
+        # Calculate ideal positions for the roles (11 roles total)
         role_positions = self.calculate_role_positions()
 
         # Create a dictionary mapping agent_unum to their current positions
@@ -94,28 +96,25 @@ class Tactics():
             for p in w.teammates
         }
 
-        # Initialize the bestRoleMap to store optimal assignments for each subset of players
-        n = len(agents_unums)
+        # Find the active player (the closest player to the ball) and exclude them from the subset
+        ball_position = w.ball_abs_pos[:2]
+        active_player_unum = min(
+            [p.unum for p in w.teammates if p.unum != 1],  # Exclude goalkeeper (unum 1)
+            key=lambda unum: np.linalg.norm(np.array(agent_current_positions[unum]) - np.array(ball_position))
+        )
+        agents_unums.remove(active_player_unum)  # Remove active player from the list of agents
+
+        # Initialize the bestRoleMap to store optimal assignments for each subset of inactive players
+        n = len(agents_unums)  # Now n is 9 (excluding the active player and goalkeeper)
         self.bestRoleMap = {frozenset(): (None, 0)}  # (Mapping, Cost) for an empty set
 
-        # Handle the special case where there is only one agent (only the goalkeeper)
-        if n == 1:
-            return {agents_unums[0]: role_positions[0]}, 0
-
-        # Loop through each position to assign (1 to n), ensuring unum 1 is always the goalkeeper
-        for k in range(1, n + 1):
+        for k in range(3, n + 3):  # Start from 2, as position 1 is reserved for the GK
             pk = role_positions[k - 1]  # Current role position to be assigned
-
-            # Iterate through each agent to assign the current role
+            
+            # Iterate through each inactive player to assign the current role
             for a in agents_unums:
-                # Ensure unum 1 (goalkeeper) is always assigned to the goalkeeper position
-                if a == 1 and k != 1:
-                    continue  # Skip if trying to assign a non-goalkeeper position to the goalkeeper
-                if a != 1 and k == 1:
-                    continue  # Skip if trying to assign the goalkeeper role to a non-goalkeeper player
-
                 remaining_agents = [agent for agent in agents_unums if agent != a]
-                subsets = list(itertools.combinations(remaining_agents, k - 1))
+                subsets = list(itertools.combinations(remaining_agents, k - 3))  # Subset of inactive players, excluding current agent
 
                 # Iterate through each subset of agents to assign the current role
                 for subset in subsets:
@@ -134,11 +133,17 @@ class Tactics():
                     if (subset_set | frozenset({a})) not in self.bestRoleMap or cost < self.bestRoleMap[subset_set | frozenset({a})][1]:
                         self.bestRoleMap[subset_set | frozenset({a})] = (new_mapping, cost)
 
-        # Ensure that unum 1 is always assigned the goalkeeper role
+        # Retrieve the optimal assignment for the inactive players
         optimal_assignment = self.bestRoleMap[frozenset(agents_unums)][0]
+
+        # Manually assign the goalkeeper (unum 1) to the goalkeeper role (position 1)
         optimal_assignment[1] = role_positions[0]  # Goalkeeper position at index 0
 
+        # Manually assign the active player (closest to the ball) to the striker role (position 2)
+        optimal_assignment[active_player_unum] = role_positions[1]  # Striker position at index 1
+
         return optimal_assignment  # Return the optimal role assignment
+
 
     def calculate_cost(self, mapping, current_positions):
         """
