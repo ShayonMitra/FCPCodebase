@@ -24,6 +24,9 @@ class Base_Agent():
         self.path_manager = Path_Manager(self.world)
         self.radio = Radio(self.world, self.scom.commit_announcement)
         self.behavior.create_behaviors()
+        self.world.behavior = self.behavior
+        self.world.path_manager = self.path_manager
+        self.world.scom = self.scom
         Base_Agent.all_agents.append(self)
 
     @abstractmethod

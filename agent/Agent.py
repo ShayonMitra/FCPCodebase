@@ -5,6 +5,7 @@ import numpy as np
 import itertools
 from agent.Roles import *
 from agent.Tactics import *
+import time
 
 
 class Agent(Base_Agent):
@@ -31,6 +32,10 @@ class Agent(Base_Agent):
         self.fat_proxy_walk = np.zeros(3) # filtered walk parameters for fat proxy
         self.role=None
         self.init_pos = ([-14,0],[-9,-5],[-9,0],[-9,5],[-5,-5],[-5,0],[-5,5],[-1,-6],[-1,-2.5],[-1,2.5],[-1,6])[unum-1] # initial formation
+        # Initialising Tactic and Role
+        self.myTactic = None
+        self.myRole = None
+        self.cycles = 0
 
 
     def beam(self, avoid_center_circle=False):
@@ -190,45 +195,45 @@ class Agent(Base_Agent):
         elif PM == w.M_THEIR_KICKOFF:
             self.move(self.init_pos, orientation=ball_dir) # walk in place
         
-        
-        else:
-            # if r.unum == 1: # I am the goalkeeper
-            #     self.move(self.init_pos, orientation=ball_dir) # walk in place 
-            # else:
+        else:            
+            # dynamic role assignment to calculate the new position of the inactive players
+            if self.cycles == 0:
+                self.myTactic = Tactics(True, True, w, r.unum)
+                self.myRole = self.myTactic.getPlayerRole()
+                self.cycles = 20
+            else:
+                self.cycles -= 1
 
-                # dynamic role assignment to calculate the new position of the inactive players
-                if self.cycles == 0:
-                    role_mapping = self.dynamic_role_assignment(active_player_unum)
-                    myTactic = Tactics(True, True, w, r.unum)
-                    myRole = myTactic.getPlayerRole()
-                    
-                    new_x, new_y = myRole.idealPos
-                    self.old_pos = (new_x, new_y)
-                    
-                    self.cycles = 20
-                else:
-                    self.cycles -= 1
-                    new_x, new_y = self.old_pos
-
-                # Now call the new EWMA function to smooth the transition
-                # smoothed_x, smoothed_y = self.apply_ewma_to_positions((new_x, new_y), r.unum)
-
-                # Move the agent to the smoothed position
-                # self.move((smoothed_x, smoothed_y), orientation=ball_dir, priority_unums=[active_player_unum])
-
-                # compute basic formation position based on ball position
-                # new_x = max(0.5,(ball_2d[0]+15)/15) * (self.init_pos[0]+15) - 15
             
-                # if self.min_teammate_ball_dist < self.min_opponent_ball_dist:
-                #     new_x = min(new_x + 3.5, 13) # advance if team has possession
-                # self.move((new_x,self.init_pos[1]), orientation=ball_dir, priority_unums=[active_player_unum])
-                if self.enable_draw: 
-                    d = w.draw
-                    d.point((new_x,new_y), 5, d.Color.blue, "target", False) # last ball prediction
-                    d.annotation((new_x,new_y), f"{r.unum}" , d.Color.yellow, "target")
+            new_x, new_y = self.myRole.idealPos
+            # self.old_pos = (new_x, new_y)
+            
+            # self.cycles = 20
+            # else:
+            #     self.cycles -= 1
+            #     new_x, new_y = self.old_pos
 
-                self.move((new_x,new_y), orientation=None, priority_unums=[active_player_unum])
-                # myRole.move2point()
+            # Now call the new EWMA function to smooth the transition
+            # smoothed_x, smoothed_y = self.apply_ewma_to_positions((new_x, new_y), r.unum)
+
+            # Move the agent to the smoothed position
+            # self.move((smoothed_x, smoothed_y), orientation=ball_dir, priority_unums=[active_player_unum])
+
+            # compute basic formation position based on ball position
+            # new_x = max(0.5,(ball_2d[0]+15)/15) * (self.init_pos[0]+15) - 15
+
+            # if self.min_teammate_ball_dist < self.min_opponent_ball_dist:
+            #     new_x = min(new_x + 3.5, 13)  # advance if team has possession
+            # self.move((new_x,self.init_pos[1]), orientation=ball_dir, priority_unums=[active_player_unum])
+
+            if self.enable_draw: 
+                d = w.draw
+                d.point((new_x,new_y), 5, d.Color.blue, "target", False)  # last ball prediction
+                d.annotation((new_x,new_y), f"{r.unum}", d.Color.yellow, "target")
+
+            self.myRole.default_action()
+            # self.move((new_x, new_y), orientation=None, priority_unums=[active_player_unum])
+
 
         # else: # I am the active player
         #     # print("Active player", r.unum)
