@@ -27,6 +27,8 @@ class Robot():
     # Fix symmetry issues 1a/4 (identification)                                  
     FIX_PERCEPTOR_SET = {'rlj2','rlj6','raj2','laj3','laj4'}
     FIX_INDICES_LIST = [5,13,17,18,20]
+    # FIX_PERCEPTOR_SET = {}
+    # FIX_INDICES_LIST = []
 
     # Recommended height for unofficial beam (near ground)
     BEAM_HEIGHTS = [0.4, 0.43, 0.4, 0.46, 0.4]
@@ -184,6 +186,14 @@ class Robot():
 
         assert joint_no == self.no_of_joints, "The Robot XML and the robot type don't match!"
 
+        self.current_angles = np.zeros(self.no_of_joints) # Current angles (rad)
+        self.previous_errors = np.zeros(self.no_of_joints) # Previous errors (rad)
+        self.current_errors = np.zeros(self.no_of_joints)  # Current errors (rad)
+        self.cumulative_errors = np.zeros(self.no_of_joints) # Cumulative errors (rad)
+        self.target_angles = np.zeros(self.no_of_joints) # Target angles (rad)
+        self.P, self.I, self.D = 0.15, 0.0, 0.01 # PID constants
+        self.ET = 2.0 # Error threshold (rad)
+        self.slot = 0
 
     def get_head_abs_vel(self, history_steps:int):
         '''
@@ -478,6 +488,9 @@ class Robot():
         assert type(values) == np.ndarray, "'values' argument must be a numpy array"
         np.nan_to_num(values, copy=False) # Replace NaN with zero and infinity with large finite numbers
 
+        self.update_errors()
+        self.target_angles[indices] = values
+
         # limit range of joints
         if limit_joints:     
             if type(indices) == list or type(indices) == np.ndarray:
@@ -528,6 +541,60 @@ class Robot():
         Builds commands string from self.joints_target_speed
         '''
         j_speed = self.joints_target_speed * self.FIX_EFFECTOR_MASK #Fix symmetry issues 3/4 (effectors)
+        cmd = "".join(f"({self.joints_info[i].effector} {j_speed[i]:.5f})" for i in range(self.no_of_joints)).encode('utf-8')
+
+        self.joints_target_last_speed = self.joints_target_speed           #1. both point to the same array
+        self.joints_target_speed = np.zeros_like(self.joints_target_speed) #2. create new array for joints_target_speed
+        return cmd
+
+
+    def update_errors(self):
+        self.previous_errors = self.current_errors
+        # unmask the joints position that were masked during perceptor
+        unmasked_position = self.joints_position.copy()
+        for idx in self.FIX_INDICES_LIST:
+            unmasked_position[idx] = -unmasked_position[idx]
+        self.current_errors = self.target_angles - unmasked_position
+        self.cumulative_errors += self.current_errors
+
+    def set_joints_target_position_direct_ut(self, indices, values, limit_joints=True):
+
+        self.update_errors()
+        self.target_angles[indices] = values
+
+        assert type(values) == np.ndarray, "'values' argument must be a numpy array"
+        np.nan_to_num(values, copy=False)
+
+        if limit_joints:
+            if type(indices) == list or type(indices) == np.ndarray:
+                for i in range(len(indices)):
+                    values[i] = np.clip(values[i], self.joints_info[indices[i]].min, self.joints_info[indices[i]].max)
+            elif type(indices) == slice:
+                info = self.joints_info[indices]
+                for i in range(len(info)):
+                    values[i] = np.clip(values[i], info[i].min, info[i].max)
+            else:
+
+                values[0] = np.clip(values[0], self.joints_info[indices].min, self.joints_info[indices].max)
+
+        torques = np.zeros(self.no_of_joints)
+
+        for i in range(len(indices)):
+            effectorID = indices[i]
+            torque = self.P* self.current_errors[effectorID]
+            torque += self.I* self.cumulative_errors[effectorID]
+            torque += self.D * (self.current_errors[effectorID] - self.previous_errors[effectorID])
+            torques[effectorID] = torque
+        
+        self.joints_target_speed[indices] = torques[indices]
+
+        for idx in self.FIX_INDICES_LIST:
+            self.joints_target_speed[idx] = -self.joints_target_speed[idx]
+
+        return 1
+
+    def get_command_ut(self) -> bytes:
+        j_speed = self.joints_target_speed 
         cmd = "".join(f"({self.joints_info[i].effector} {j_speed[i]:.5f})" for i in range(self.no_of_joints)).encode('utf-8')
 
         self.joints_target_last_speed = self.joints_target_speed           #1. both point to the same array

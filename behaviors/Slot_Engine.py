@@ -71,6 +71,7 @@ class Slot_Engine():
 
     def reset(self, name):
         ''' Initialize/Reset slot behavior '''
+        print("Resetting")
 
         self.state_slot_number = 0
         self.state_slot_start_time_ms = self.world.time_local_ms
@@ -104,7 +105,11 @@ class Slot_Engine():
         # Execute 
         progress = (elapsed_ms+20) / delta_ms
         target = (angles - self.state_slot_start_angles[indices]) * progress + self.state_slot_start_angles[indices]
-        self.world.robot.set_joints_target_position_direct(indices,target,False)
+        self.world.robot.slot = self.state_slot_number
+        if name == "Kick_Motion_15":
+            self.world.robot.set_joints_target_position_direct_ut(indices,target,False)
+        else:
+            self.world.robot.set_joints_target_position_direct(indices,target,False)
 
         # Return True if finished (this is the last step)
         return bool(elapsed_ms+20 >= delta_ms and self.state_slot_number + 1 == len(self.behaviors[name])) # true if next step (now+20ms) is out of bounds
