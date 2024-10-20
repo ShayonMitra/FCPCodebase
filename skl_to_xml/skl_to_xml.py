@@ -50,9 +50,10 @@ class Skill:
         xml = """<?xml version="1.0" encoding="UTF-8"?>"""
         xml += "\n\n"
         xml += f"<behavior description=\"{self.skill_name}\" auto_head=\"{self.auto_head}\">"
-        for key_frame in self.converted_key_frames:
+        for i, key_frame in enumerate(self.converted_key_frames):
             xml += "\n\t"
-            xml += f"<slot delta=\"{key_frame.wait_time}\">"
+            delta = 0.001 if i == 0 else self.converted_key_frames[i-1].wait_time
+            xml += f"<slot delta=\"{delta}\">"
             for macro in key_frame.macros:
                 if isinstance(macro, SetTar):
                     for effector, value in macro.effector_pairs:

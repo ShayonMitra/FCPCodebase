@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
 <behavior description="SKILL_KICKLONG_15_RIGHT_LEG" auto_head="1">
-	<slot delta="0.02">
+	<slot delta="0.001">
 		<move id="15" angle="-80.94" />
 		<move id="17" angle="-15.87" />
 		<move id="19" angle="70.0" />
