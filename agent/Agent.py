@@ -198,9 +198,12 @@ class Agent(Base_Agent):
         else:            
             # dynamic role assignment to calculate the new position of the inactive players
             if self.cycles == 0:
+                start_time = time.time()
                 self.myTactic = Tactics(True, True, w, r.unum)
                 self.myRole = self.myTactic.getPlayerRole()
                 self.cycles = 20
+                end_time = time.time()
+                print(f"Time taken for role assignment: {end_time - start_time}")
             else:
                 self.cycles -= 1
 

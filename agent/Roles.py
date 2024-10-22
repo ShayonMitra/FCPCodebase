@@ -99,12 +99,18 @@ class Role:
 
         return self.behavior.execute("Basic_Kick", self.kick_direction, abort) # Basic_Kick has no kick distance control
 
+    def dribble(self, orientation = None, is_orientation_absolute = None, speed=1, stop=False):
+        self.behavior.execute("Dribble", orientation, is_orientation_absolute, speed, stop)
+
     def default_action(self):
         self.move(self.idealPos, orientation=None)
 
 class Striker(Role):
     def __repr__(self) -> str:
         return "Striker"
+
+    def default_action(self):
+        self.dribble()
 
 class LeftWing(Role):
     def __repr__(self) -> str:
